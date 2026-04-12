@@ -19,9 +19,16 @@ def run_feature_phase(
         task_desc=task_desc, profile=data_profile, target_col=target_col
     )
 
-    for attempt in range(1, 4):
-        print(f"\n Генерация фич: попытка {attempt}")
-        resp = llm.invoke([HumanMessage(content=prompt)])
+    max_attempts = 8
+    for attempt in range(1, max_attempts + 1):
+        print(f"\n Генерация фич: попытка {attempt}/{max_attempts}")
+        try:
+            resp = llm.invoke([HumanMessage(content=prompt)])
+        except Exception as e:
+            print(f" Ошибка LLM: {e}")
+            if attempt >= max_attempts:
+                raise
+            continue
         code = extract_code(str(resp.content) if hasattr(resp, "content") else str(resp))
 
         try:
@@ -39,4 +46,6 @@ def run_feature_phase(
             line_no, line_text = extract_exec_error(code, e)
             prompt += f"\n\n[ОШИБКА]: {e} в строке {line_no}: {line_text}\nИсправь код и верни заново."
 
-    raise RuntimeError("Не удалось сгенерировать 5 фич за 3 попытки")
+    raise RuntimeError(
+        f"Не удалось сгенерировать фичи за {max_attempts} попыток"
+    )

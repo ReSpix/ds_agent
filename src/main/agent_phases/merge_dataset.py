@@ -32,9 +32,16 @@ def merge_phase(
         ),
     ]
 
-    for attempt in range(1, 6):
-        print(f"\nПопытка {attempt}/5")
-        response = llm.invoke(messages)
+    max_attempts = 8
+    for attempt in range(1, max_attempts + 1):
+        print(f"\nПопытка {attempt}/{max_attempts}")
+        try:
+            response = llm.invoke(messages)
+        except Exception as e:
+            print(f"Ошибка LLM: {e}")
+            if attempt >= max_attempts:
+                raise
+            continue
         code = extract_code(
             str(response.content) if hasattr(response, "content") else str(response)
         )
@@ -69,4 +76,6 @@ def merge_phase(
                 )
             )
 
-    raise RuntimeError("Не удалось получить рабочий merge-код за 5 попыток")
+    raise RuntimeError(
+        f"Не удалось получить рабочий merge-код за {max_attempts} попыток"
+    )

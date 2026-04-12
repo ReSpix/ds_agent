@@ -8,9 +8,19 @@ from src.main.utils.response_parsers import extract_code
 
 
 def run_phase2_with_advice(
-    task_desc: str, df: pd.DataFrame, profile: str, llm: GigaChat, advice: str = ""
+    task_desc: str,
+    df: pd.DataFrame,
+    profile: str,
+    llm: GigaChat,
+    advice: str = "",
+    training_feedback: str = "",
 ):
-    prompt = ADVICED_FEATURE_PROMPT.format(task_desc=task_desc, profile=profile)
+    feedback = training_feedback.strip() or (
+        "Первая итерация улучшения: детальной статистики ещё нет — опирайся на профиль и советы аналитика."
+    )
+    prompt = ADVICED_FEATURE_PROMPT.format(
+        task_desc=task_desc, profile=profile, training_feedback=feedback
+    )
 
     if advice.strip():
         prompt += f"\n\n⚡ [УЧТИ РЕКОМЕНДАЦИИ АНАЛИТИКА]:\n{advice}\nПримени их, строго соблюдая ⛔ ограничения."
@@ -20,8 +30,9 @@ def run_phase2_with_advice(
         HumanMessage(content="Начни. Верни ТОЛЬКО код."),
     ]
 
-    for attempt in range(1, 6):
-        print(f"\n Генерация (итерация 2): попытка {attempt}/5")
+    max_attempts = 8
+    for attempt in range(1, max_attempts + 1):
+        print(f"\n Генерация (итерация 2): попытка {attempt}/{max_attempts}")
         try:
             resp = llm.invoke(messages)
             code = extract_code(
@@ -39,7 +50,7 @@ def run_phase2_with_advice(
         except Exception as e:
             err_msg = f"{type(e).__name__}: {e}"
             print(f" {err_msg}")
-            if attempt == 5:
+            if attempt >= max_attempts:
                 raise RuntimeError("Генерация провалилась")
             messages.append(
                 HumanMessage(
