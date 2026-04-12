@@ -1,8 +1,10 @@
+import json
+
 import pandas as pd
 
-from main.agent_phases.feature_advice import generate_advice
-from main.agent_phases.generate_better_features import run_phase2_with_advice
-from main.boosting import select_top5_features_fast
+from src.main.agent_phases.feature_advice import generate_advice
+from src.main.agent_phases.generate_better_features import run_phase2_with_advice
+from src.main.boosting import select_top5_features_fast
 from src.main.llm_builder import build_gigachat
 from src.main.agent_phases.merge_dataset import merge_phase
 from src.main.agent_phases.generate_features_primary import run_feature_phase
@@ -10,7 +12,7 @@ from src.main.agent_phases.generate_features_primary import run_feature_phase
 from src.main.utils.atrifact_saver import ArtifactSaver
 from src.main.utils.data_profiler import build_compact_profile
 from src.main.utils.final_exporter import export_final_output
-
+from src.main.utils.response_parsers import extract_json
 
 def main():
     llm = build_gigachat()
@@ -22,8 +24,6 @@ def main():
     train = pd.read_csv("data/train.csv")
     test = pd.read_csv("data/test.csv")
 
-    # Этап 1 - формирование единого датасеста
-
     m_train, m_test, merge_code = merge_phase(
         task_desc=task_description,
         data_dir="data",
@@ -33,10 +33,18 @@ def main():
     )
     py_code_saver.save("merge", merge_code)
 
-    target_col = "target"
+    target_promt = f""" 
+        Изучи описание данных: {task_description} 
+        Определи главную колонку-идентификатор (ID) и целевую переменную (Target).  
+        Верни ТОЛЬКО JSON: {{"id_col": "...", "target_col": "..."}} 
+    """
 
-    # Этап 2 - первичная генерация новых фич
-
+    response = extract_json(llm.invoke(target_promt).content)
+    print(response)
+    keys = json.loads(response)
+    id_col = keys.get('id_col', 'id_col')
+    target_col = keys.get('target_col', 'target')
+    
     profile = build_compact_profile(m_train, target_col)
     df_with_features, feature_code, new_cols = run_feature_phase(
         task_desc=task_description,
@@ -47,11 +55,9 @@ def main():
     )
     py_code_saver.save("feature_engineering", feature_code)
 
-    # Этап 2.5 - проверка новых фич
     output_df = df_with_features[[*new_cols, target_col]]
     top5, fi, cv_auc = select_top5_features_fast(output_df, target_col=target_col)
 
-    # Этап 3 - анализ и рекомендации
     advice = generate_advice(
         task_desc=task_description,
         df_profile=profile,
@@ -61,12 +67,10 @@ def main():
         llm=llm,
     )
 
-    # Этап 4 - генерация новых фич с учетом рекомендаций
     code2, df2, cols2 = run_phase2_with_advice(
         task_desc=task_description, df=m_train, profile=profile, llm=llm, advice=advice
     )
 
-    # Этап 4.5 - проверка новых фич
     top5_final, fi_final, cv_final = select_top5_features_fast(
         df2 if df2 is not None else output_df, target_col=target_col
     )

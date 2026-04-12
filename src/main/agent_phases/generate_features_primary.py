@@ -30,13 +30,7 @@ def run_feature_phase(
             func = ns["generate_features"]
 
             df_res, new_cols = func(df.copy())
-            # new_cols = [c for c in df_res.columns if c not in df.columns]
-
-            # if len(new_cols) == 0:
-            #     raise ValueError("Функция не создала новых колонок")
-            # if len(new_cols) != 5:
-            #     raise ValueError(f"Создано {len(new_cols)} фич, нужно ровно 5: {new_cols}")
-
+         
             print(f" Успех! Новые колонки: {new_cols}")
             return df_res, code, new_cols
 

@@ -16,17 +16,15 @@ def merge_phase(
     test_df: pd.DataFrame,
     llm: GigaChat,
 ):
-    # 1. Собираем схему без лишних деталей
     schema = []
     for f in sorted(Path(data_dir).glob("*.csv")):
         if f.name in ("train.csv", "test.csv"):
             continue
-        df = pd.read_csv(f, nrows=3, low_memory=False)
+        df = pd.read_csv(f, on_bad_lines='skip')
         schema.append(
             f"📄 {f.name}\nКолонки: {list(df.columns)}\nПример:\n{df.head(2).to_string()}\n"
         )
 
-    # 2. Инициализируем диалог
     messages = [
         SystemMessage(content=MERGE_PROMPT),
         HumanMessage(
@@ -34,7 +32,6 @@ def merge_phase(
         ),
     ]
 
-    # 3. Цикл генерации → исполнение → фидбек
     for attempt in range(1, 6):
         print(f"\nПопытка {attempt}/5")
         response = llm.invoke(messages)
@@ -44,11 +41,9 @@ def merge_phase(
 
         print(code)
 
-        # Сохраняем ответ LLM в историю
         messages.append(AIMessage(content=code))
 
         try:
-            # Чистое пространство имён, только pandas/numpy
             ns = {"pd": pd, "np": np, "Path": Path}
             exec(code, ns)
             func = ns["merge_data"]
@@ -59,7 +54,7 @@ def merge_phase(
                 merged_train,
                 merged_test,
                 code,
-            )  # Возвращаем код для повторного использования
+            )  
 
         except Exception as e:
             line_no, error_line = extract_exec_error(code, e)
@@ -68,7 +63,6 @@ def merge_phase(
                 + repr(error_line)
             )
             print(err_text)
-            # Кидаем traceback обратно в контекст, LLM исправит
             messages.append(
                 HumanMessage(
                     content=f"{err_text}\nИсправь код и верни заново. Ни в коем случае не допускай ту же ошибку еще раз. Будь внимательнее к задаче. ОБЯЗАТЕЛЬНО вначале напиши комментарий почему ты допустил ошибку и как будешь ее исправлять."

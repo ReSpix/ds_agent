@@ -17,17 +17,14 @@ def select_top5_features_fast(
     """
     start = time.time()
 
-    # 1. Стратифицированный сэмпл (сохраняет распределение target)
     n = min(len(df), max_sample)
     idx = np.random.RandomState(42).choice(len(df), n, replace=False)
     df_s = df.iloc[idx].copy()
 
-    # Убираем метаданные, которые скоринг-движок всё равно отфильтрует
     drop_cols = {target_col, "row_id", "user_id", "product_id", "id", "index"}
     X = df_s.drop(columns=[c for c in drop_cols if c in df_s.columns], errors="ignore")
     y = df_s[target_col]
 
-    # 2. Предобработка под стиль официального scoring.py
     for col in X.columns:
         if X[col].dtype == "object":
             X[col] = X[col].fillna("__UNKNOWN__").astype(str)
@@ -40,8 +37,6 @@ def select_top5_features_fast(
 
     cat_indices = [i for i, c in enumerate(X.columns) if X[c].dtype == "object"]
 
-    # 3. Параметры "быстрого ранжировщика"
-    # Глубина 4 + 150 итераций = быстрый захват основных паттернов без переобучения на шум
     params = {
         "iterations": 150,
         "depth": 4,
@@ -50,7 +45,7 @@ def select_top5_features_fast(
         "eval_metric": "AUC",
         "silent": True,
         "random_seed": 42,
-        "auto_class_weights": "Balanced",  # Точно как в scoring.py
+        "auto_class_weights": "Balanced",
         "thread_count": -1,
     }
 
@@ -68,12 +63,10 @@ def select_top5_features_fast(
 
     params = CATBOOST_PARAMS
 
-    # 4. Быстрая 3-Fold CV (5-fold слишком долго, 3-fold даёт стабильный сигнал за ~0.8с/фолд)
     cv_auc = cross_val_score(
         CatBoostClassifier(**params), X, y, cv=3, scoring="roc_auc", n_jobs=1
     ).mean()
 
-    # 5. Фит на сэмпле для расчёта importance
     model = CatBoostClassifier(**params)
     model.fit(X, y, cat_features=cat_indices if cat_indices else None, verbose=False)
 
