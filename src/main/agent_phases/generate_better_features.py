@@ -3,23 +3,26 @@ import numpy as np
 from langchain_gigachat import GigaChat
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from main.prompts.text import ADVICED_FEATURE_PROMPT
-from main.utils.response_parsers import extract_code
+from src.main.config import MAX_PHASE2_ATTEMPTS
+from src.main.prompts.text import ADVICED_FEATURE_PROMPT
+from src.main.utils.response_parsers import extract_code
 
 
 def run_phase2_with_advice(
-    task_desc: str, df: pd.DataFrame, profile: str, llm: GigaChat, advice: str = ""
+    task_desc: str,
+    df: pd.DataFrame,
+    profile: str,
+    llm: GigaChat,
+    advice: str = "",
+    training_feedback: str = "",
 ):
-    # profile = "\n".join(
-    #     [
-    #         f"{c}: dtype={df[c].dtype}, nunique={df[c].nunique()}, NaN%={df[c].isna().mean():.1%}"
-    #         for c in df.select_dtypes(include=["number", "object"]).columns[:15]
-    #     ]
-    # )
+    feedback = training_feedback.strip() or (
+        "Первая итерация улучшения: детальной статистики ещё нет — опирайся на профиль и советы аналитика."
+    )
+    prompt = ADVICED_FEATURE_PROMPT.format(
+        task_desc=task_desc, profile=profile, training_feedback=feedback
+    )
 
-    prompt = ADVICED_FEATURE_PROMPT.format(task_desc=task_desc, profile=profile)
-
-    # 🔑 Инъекция советов
     if advice.strip():
         prompt += f"\n\n⚡ [УЧТИ РЕКОМЕНДАЦИИ АНАЛИТИКА]:\n{advice}\nПримени их, строго соблюдая ⛔ ограничения."
 
@@ -28,8 +31,9 @@ def run_phase2_with_advice(
         HumanMessage(content="Начни. Верни ТОЛЬКО код."),
     ]
 
-    for attempt in range(1, 6):
-        print(f"\n Генерация (итерация 2): попытка {attempt}/5")
+    max_attempts = MAX_PHASE2_ATTEMPTS
+    for attempt in range(1, max_attempts + 1):
+        print(f"\n Генерация (фаза 2): попытка {attempt} (лимит {max_attempts})")
         try:
             resp = llm.invoke(messages)
             code = extract_code(
@@ -39,17 +43,15 @@ def run_phase2_with_advice(
             ns = {"pd": pd, "np": np}
             exec(code, ns)
             df_res, new_cols = ns["generate_features"](df.copy())
-            # new_cols = [c for c in df_res.columns if c not in df.columns]
-
+           
             assert len(new_cols) >= 8, f"Слишком мало фич: {len(new_cols)}"
             print(f" Успех! Сгенерировано {len(new_cols)} фич.")
             return code, df_res, new_cols
 
         except Exception as e:
-            # Ваша extract_exec_error логика здесь
             err_msg = f"{type(e).__name__}: {e}"
             print(f" {err_msg}")
-            if attempt == 5:
+            if attempt >= max_attempts:
                 raise RuntimeError("Генерация провалилась")
             messages.append(
                 HumanMessage(
