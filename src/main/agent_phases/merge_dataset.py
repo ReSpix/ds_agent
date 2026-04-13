@@ -23,7 +23,7 @@ def merge_phase(
             continue
         df = pd.read_csv(f, on_bad_lines='skip')
         schema.append(
-            f"📄 {f.name}\nКолонки: {list(df.columns)}\nПример:\n{df.head(2).to_string()}\n"
+            f"{f.name}\nКолонки: {list(df.columns)}\nПример:\n{df.head(2).to_string().encode('ascii', 'ignore').decode('ascii')}\n"
         )
 
     messages = [
@@ -35,11 +35,11 @@ def merge_phase(
 
     max_attempts = MAX_MERGE_CODE_ATTEMPTS
     for attempt in range(1, max_attempts + 1):
-        print(f"\nПопытка merge {attempt} (лимит {max_attempts})")
+        #print(f"\nПопытка merge {attempt} (лимит {max_attempts})")
         try:
             response = llm.invoke(messages)
         except Exception as e:
-            print(f"Ошибка LLM: {e}")
+            #print(f"Ошибка LLM: {e}")
             if attempt >= max_attempts:
                 raise
             continue
@@ -47,7 +47,7 @@ def merge_phase(
             str(response.content) if hasattr(response, "content") else str(response)
         )
 
-        print(code)
+        #print(code)
 
         messages.append(AIMessage(content=code))
 
@@ -57,7 +57,7 @@ def merge_phase(
             func = ns["merge_data"]
 
             merged_train, merged_test = func(train_df.copy(), test_df.copy(), data_dir)
-            print(f" Успех! Train: {merged_train.shape}, Test: {merged_test.shape}")
+            #print(f"Успех! Train: {merged_train.shape}, Test: {merged_test.shape}")
             return (
                 merged_train,
                 merged_test,
@@ -67,10 +67,10 @@ def merge_phase(
         except Exception as e:
             line_no, error_line = extract_exec_error(code, e)
             err_text = (
-                f"❌ Ошибка '{type(e).__name__}: {e}' в строке {line_no}:"
+                f"Ошибка '{type(e).__name__}: {e}' в строке {line_no}:"
                 + repr(error_line)
             )
-            print(err_text)
+            #print(err_text)
             messages.append(
                 HumanMessage(
                     content=f"{err_text}\nИсправь код и верни заново. Ни в коем случае не допускай ту же ошибку еще раз. Будь внимательнее к задаче. ОБЯЗАТЕЛЬНО вначале напиши комментарий почему ты допустил ошибку и как будешь ее исправлять."

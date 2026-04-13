@@ -1,5 +1,6 @@
 import inspect
 import json
+import os
 
 import numpy as np
 import pandas as pd
@@ -122,6 +123,11 @@ def call_phase2_with_compat(
 
     return run_phase2_with_advice(**kwargs)
 
+def merge_final_features(original_df, features_df, id_col, top_features):
+    # Оставляем только ID и новые топ-5 признаков
+    new_data = features_df[[id_col] + list(top_features)].drop_duplicates(subset=[id_col])
+    # Делаем left join к оригиналу — это гарантирует сохранность всех исходных колонок
+    return original_df.merge(new_data, on=id_col, how='left')
 
 def main():
     llm = build_gigachat()
@@ -299,13 +305,27 @@ def main():
     export_final_output(
         code=best_code_chain[-1],
         selected_features=best_top5,
-        train_df_features=best_df,
-        test_df_features=final_test_features,
+        train_df_features=best_df, 
+        test_df_features=final_test_features, 
         original_train=train,
         original_test=test,
         id_col=id_col,
         target_col=target_col,
     )
+
+    # 2. Формируем идеальную структуру: Исходные колонки + 5 лучших фичей
+    final_train_to_export = merge_final_features(
+        train, best_df, id_col, best_top5
+    )
+    final_test_to_export = merge_final_features(
+        test, final_test_features, id_col, best_top5
+    )
+
+    # 3. Жестко перезаписываем CSV-файлы поверх тех, что создал export_final_output
+
+    os.makedirs("output", exist_ok=True)
+    final_train_to_export.to_csv("output/train.csv", index=False)
+    final_test_to_export.to_csv("output/test.csv", index=False)
 
 
 if __name__ == "__main__":

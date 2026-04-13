@@ -25,7 +25,7 @@ def _env_float(name: str, default: float) -> float:
 
 
 # Целевой ROC-AUC (holdout в select_top5_features_fast); цикл улучшения крутится, пока лучший score ниже.
-TARGET_ROC_AUC = _env_float("TARGET_ROC_AUC", 0.75)
+TARGET_ROC_AUC = _env_float("TARGET_ROC_AUC", 0.8)
 
 # Внешний цикл улучшения признаков (после phase 1)
 MAX_IMPROVE_ROUNDS = _env_int("MAX_IMPROVE_ROUNDS", 10**9)
