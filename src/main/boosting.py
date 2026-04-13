@@ -142,7 +142,7 @@ def _top_errors_summary(
 def select_top5_features_fast(
     df: pd.DataFrame,
     target_col: str = "target",
-    max_sample: int = 100_000,
+    max_sample: int = 50_000,
     time_budget: float = 25.0,
 ) -> CatBoostEvalResult:
     """
