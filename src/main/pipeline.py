@@ -14,6 +14,7 @@ from src.main.utils.atrifact_saver import ArtifactSaver
 from src.main.utils.data_profiler import build_compact_profile
 from src.main.utils.final_exporter import export_final_output
 from src.main.utils.response_parsers import extract_json
+from src.main.config import MAX_IMPROVE_ROUNDS, TARGET_ROC_AUC
 
 
 def deduplicate_cols(cols: list[str]) -> list[str]:
@@ -132,8 +133,10 @@ def main():
     train = pd.read_csv("data/train.csv")
     test = pd.read_csv("data/test.csv")
 
-    max_extra_rounds = 100
-    max_target_auc = 0.80
+    print(
+        f"Параметры остановки: TARGET_ROC_AUC={TARGET_ROC_AUC}, "
+        f"MAX_IMPROVE_ROUNDS={MAX_IMPROVE_ROUNDS}"
+    )
 
     # ===== 1. MERGE =====
     m_train, m_test, merge_code = merge_phase(
@@ -210,15 +213,13 @@ def main():
     current_code_chain = [phase1_code]
 
     # ===== 7. ITERATIVE IMPROVEMENT =====
-    for round_idx in range(1, max_extra_rounds + 1):
+    round_idx = 0
+    while best_score < TARGET_ROC_AUC and round_idx < MAX_IMPROVE_ROUNDS:
+        round_idx += 1
         print(
-            f"\n=== Итерация улучшения {round_idx}/{max_extra_rounds} "
-            f"(CV ROC-AUC={best_score:.4f}, цель {max_target_auc}) ==="
+            f"\n=== Итерация улучшения {round_idx} "
+            f"(лучший holdout ROC-AUC={best_score:.4f}, цель {TARGET_ROC_AUC}) ==="
         )
-
-        if best_score >= max_target_auc:
-            print("Целевой score достигнут, останавливаемся.")
-            break
 
         try:
             advice = generate_advice(
@@ -271,13 +272,17 @@ def main():
                 best_code_chain = list(current_code_chain)
 
         except Exception as e:
-            print(f"Итерация улучшения остановлена: {e}")
-            break
+            print(f"Итерация улучшения: ошибка, переходим к следующей попытке: {e}")
+            continue
 
-    if best_score < max_target_auc:
+    if best_score < TARGET_ROC_AUC:
+        raise ValueError(
+            f"Лучший holdout ROC-AUC {best_score:.4f} < цели {TARGET_ROC_AUC}. "
+            f"Итераций улучшения: {round_idx}; лимит MAX_IMPROVE_ROUNDS={MAX_IMPROVE_ROUNDS}."
+        )
+    else:
         print(
-            f"\nПредупреждение: CV ROC-AUC {best_score:.4f} < {max_target_auc} "
-            f"после итераций улучшения."
+            f"\nЦель достигнута: holdout ROC-AUC >= {TARGET_ROC_AUC} (лучший {best_score:.4f})."
         )
 
     print("\n[FINAL BEST]")

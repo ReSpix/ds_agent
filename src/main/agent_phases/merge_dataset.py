@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.main.utils.response_parsers import extract_code
 from src.main.utils.traceback_extractor import extract_exec_error
+from src.main.config import MAX_MERGE_CODE_ATTEMPTS
 from src.main.prompts.text import MERGE_PROMPT
 
 
@@ -32,9 +33,9 @@ def merge_phase(
         ),
     ]
 
-    max_attempts = 8
+    max_attempts = MAX_MERGE_CODE_ATTEMPTS
     for attempt in range(1, max_attempts + 1):
-        print(f"\nПопытка {attempt}/{max_attempts}")
+        print(f"\nПопытка merge {attempt} (лимит {max_attempts})")
         try:
             response = llm.invoke(messages)
         except Exception as e:

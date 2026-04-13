@@ -3,7 +3,7 @@ import time
 from langchain_gigachat import GigaChat
 from langchain_core.messages import SystemMessage, HumanMessage
 
-_ADVICE_LLM_ATTEMPTS = 8
+from src.main.config import MAX_ADVICE_LLM_ATTEMPTS
 
 
 def generate_advice(
@@ -44,14 +44,17 @@ def generate_advice(
         HumanMessage(content="Проанализируй и верни рекомендации."),
     ]
     last_err: Exception | None = None
-    for attempt in range(1, _ADVICE_LLM_ATTEMPTS + 1):
+    for attempt in range(1, MAX_ADVICE_LLM_ATTEMPTS + 1):
         try:
             resp = llm.invoke(messages)
             return str(resp.content) if hasattr(resp, "content") else str(resp)
         except Exception as e:
             last_err = e
-            print(f"\n generate_advice: LLM попытка {attempt}/{_ADVICE_LLM_ATTEMPTS}: {e}")
-            if attempt >= _ADVICE_LLM_ATTEMPTS:
+            print(
+                f"\n generate_advice: LLM попытка {attempt} "
+                f"(лимит {MAX_ADVICE_LLM_ATTEMPTS}): {e}"
+            )
+            if attempt >= MAX_ADVICE_LLM_ATTEMPTS:
                 break
             time.sleep(min(2 ** (attempt - 1), 16))
     assert last_err is not None

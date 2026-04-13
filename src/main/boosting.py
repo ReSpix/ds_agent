@@ -7,6 +7,8 @@ from catboost import CatBoostClassifier
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import train_test_split
 
+from src.main.config import MAX_CATBOOST_EVAL_RETRIES
+
 
 @dataclass
 class CatBoostEvalResult:
@@ -181,7 +183,7 @@ def select_top5_features_fast(
 
     n_classes = int(y.nunique())
 
-    max_attempts = 6
+    max_attempts = MAX_CATBOOST_EVAL_RETRIES
     cv_auc = 0.0
     fi = pd.Series(dtype=float)
     top5: list[str] = []
@@ -264,6 +266,7 @@ def select_top5_features_fast(
             )
             if attempt >= max_attempts:
                 raise
+            time.sleep(min(2 ** (attempt - 1), 16))
 
     total_sec = time.perf_counter() - start
     print(f"    Holdout ROC-AUC (20% val): {cv_auc:.4f}")

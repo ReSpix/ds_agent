@@ -3,6 +3,7 @@ import numpy as np
 from langchain_gigachat import GigaChat
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
+from src.main.config import MAX_FEATURE_PHASE_ATTEMPTS
 from src.main.prompts.text import FEATURE_PROMPT
 from src.main.utils.response_parsers import extract_code
 from src.main.utils.traceback_extractor import extract_exec_error
@@ -19,9 +20,9 @@ def run_feature_phase(
         task_desc=task_desc, profile=data_profile, target_col=target_col
     )
 
-    max_attempts = 8
+    max_attempts = MAX_FEATURE_PHASE_ATTEMPTS
     for attempt in range(1, max_attempts + 1):
-        print(f"\n Генерация фич: попытка {attempt}/{max_attempts}")
+        print(f"\n Генерация фич: попытка {attempt} (лимит {max_attempts})")
         try:
             resp = llm.invoke([HumanMessage(content=prompt)])
         except Exception as e:

@@ -3,6 +3,7 @@ import numpy as np
 from langchain_gigachat import GigaChat
 from langchain_core.messages import SystemMessage, HumanMessage
 
+from src.main.config import MAX_PHASE2_ATTEMPTS
 from src.main.prompts.text import ADVICED_FEATURE_PROMPT
 from src.main.utils.response_parsers import extract_code
 
@@ -30,9 +31,9 @@ def run_phase2_with_advice(
         HumanMessage(content="Начни. Верни ТОЛЬКО код."),
     ]
 
-    max_attempts = 8
+    max_attempts = MAX_PHASE2_ATTEMPTS
     for attempt in range(1, max_attempts + 1):
-        print(f"\n Генерация (итерация 2): попытка {attempt}/{max_attempts}")
+        print(f"\n Генерация (фаза 2): попытка {attempt} (лимит {max_attempts})")
         try:
             resp = llm.invoke(messages)
             code = extract_code(
